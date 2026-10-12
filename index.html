@@ -142,9 +142,13 @@
             <span>Purchase Protection Rate</span>
             <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">3.00%</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span>Payment Notes</span>
-            <span class="text-[11px] text-slate-500">Venmo / Zelle / PayPal</span>
+          <div class="space-y-2 pt-1">
+            <label for="venmo-handle" class="block font-medium">Venmo</label>
+            <input id="venmo-handle" type="text" placeholder="Enter Venmo handle" autocomplete="off"
+              class="w-full p-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400">
+            <label for="paypal-handle" class="block font-medium">PayPal</label>
+            <input id="paypal-handle" type="text" placeholder="Enter PayPal handle" autocomplete="off"
+              class="w-full p-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400">
           </div>
         </div>
       </div>
@@ -256,6 +260,9 @@
                 <span class="font-bold text-slate-800 block mb-1">Payment Instructions</span>
                 <p class="text-[11px] leading-relaxed">
                   Include your <strong>Invoice #</strong> in the payment memo.
+                </p>
+                <p class="text-[11px] leading-relaxed mt-1">
+                  Venmo <span id="invoice-venmo">_____</span> or PayPal <span id="invoice-paypal">_____</span>
                 </p>
               </div>
             </div>
@@ -521,6 +528,29 @@ let purchases = [
 ];
 
 let selectedBuyerName = purchases[0].buyer;
+const paymentMethods = {
+  venmo: '',
+  paypal: ''
+};
+
+try {
+  Object.assign(paymentMethods, JSON.parse(localStorage.getItem('selkie-payment-methods') || '{}'));
+} catch (error) {
+  // Use blank payment handles if saved settings are unavailable or invalid.
+}
+
+function updatePaymentMethods() {
+  paymentMethods.venmo = document.getElementById('venmo-handle').value.trim();
+  paymentMethods.paypal = document.getElementById('paypal-handle').value.trim();
+
+  try {
+    localStorage.setItem('selkie-payment-methods', JSON.stringify(paymentMethods));
+  } catch (error) {
+    // Keep the current settings available for this session if storage is unavailable.
+  }
+
+  renderInvoice();
+}
 
 function formatCurrency(num) {
   return new Intl.NumberFormat('en-US', {
@@ -624,6 +654,8 @@ function renderInvoice() {
 
   // Populate header and exact buyer name from spreadsheet
   document.getElementById('inv-buyer-name').textContent = buyerData.name;
+  document.getElementById('invoice-venmo').textContent = paymentMethods.venmo || '_____';
+  document.getElementById('invoice-paypal').textContent = paymentMethods.paypal || '_____';
   
   // Deterministic invoice ID based on buyer initials & timestamp
   const initials = buyerData.name.split(/\s+/).map(n => n[0]).join('').toUpperCase() || 'SB';
@@ -708,6 +740,7 @@ function generateMessengerReceipt(buyerName) {
   msg += `👤 𝗕𝘂𝘆𝗲𝗿: ${buyerName}\n`;
   msg += `🧾 𝗜𝗻𝘃𝗼𝗶𝗰𝗲 #: ${invoiceId}\n`;
   msg += `⚠️ 𝗡𝗼𝘁𝗲: Shipping is not included in this invoice.\n`;
+  msg += `💸 Payment: Venmo ${paymentMethods.venmo || '_____'} or PayPal ${paymentMethods.paypal || '_____'}\n`;
   msg += `─────────────────────────\n\n`;
   msg += `🛍️ 𝗜𝗧𝗘𝗠 𝗕𝗥𝗘𝗔𝗞𝗗𝗢𝗪𝗡:\n\n`;
 
@@ -1060,6 +1093,10 @@ document.getElementById('buyer-search-input').addEventListener('input', (e) => {
 });
 
 window.onload = function() {
+  document.getElementById('venmo-handle').value = paymentMethods.venmo;
+  document.getElementById('paypal-handle').value = paymentMethods.paypal;
+  document.getElementById('venmo-handle').addEventListener('input', updatePaymentMethods);
+  document.getElementById('paypal-handle').addEventListener('input', updatePaymentMethods);
   renderBuyerList();
   renderInvoice();
 };
