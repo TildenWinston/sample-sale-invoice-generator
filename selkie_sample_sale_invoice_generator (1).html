@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selkie Sample Sale - Buyer Invoice Generator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons for UI accents -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Libraries for Bulk PDF generation & ZIP packaging -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .font-serif-title {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #invoice-printable, #invoice-printable * {
+        visibility: visible;
+      }
+      #invoice-printable {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 24px;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+
+<header class="bg-white border-b border-rose-100 shadow-xs sticky top-0 z-30">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-400 via-pink-400 to-amber-200 flex items-center justify-center text-white shadow-sm ring-2 ring-rose-100">
+        <i class="ph-bold ph-receipt text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-slate-900 leading-tight">Selkie Sample Sale</h1>
+        <p class="text-xs text-rose-500 font-medium">Buyer Invoicing & Settlement Hub</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button id="btn-import-csv" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-1.5 border border-rose-200">
+        <i class="ph-bold ph-file-csv text-sm"></i>
+        <span>Load Custom CSV</span>
+      </button>
+      <button id="btn-bulk-pdf" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1.5 shadow-sm">
+        <i class="ph-bold ph-archive text-sm"></i>
+        <span id="bulk-btn-text">Bulk Download All PDFs</span>
+      </button>
+      <button onclick="window.print()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-sm">
+        <i class="ph-bold ph-printer text-sm"></i>
+        <span>Print / Save PDF</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left Column: Buyer List & Controls -->
+    <aside class="lg:col-span-4 space-y-5">
+      <!-- Search & Buyer Selector Card -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <i class="ph-bold ph-users text-rose-500"></i> Buyers List (<span id="buyer-count">0</span>)
+          </h2>
+          <button id="btn-add-item-modal" class="text-xs text-rose-600 font-semibold hover:text-rose-700 flex items-center gap-1">
+            <i class="ph-bold ph-plus-circle"></i> Add Item
+          </button>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative mb-3">
+          <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+          <input id="buyer-search-input" type="text" placeholder="Search buyer name or handle..." 
+            class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 transition">
+        </div>
+
+        <!-- Buyer List Scrollable -->
+        <div id="buyer-list" class="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Quick Summary Stats Card -->
+      <div class="bg-gradient-to-br from-rose-50 via-white to-pink-50/50 rounded-2xl border border-rose-100 p-4 shadow-xs">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-rose-800 mb-3 flex items-center gap-1.5">
+          <i class="ph-bold ph-chart-pie-slice"></i> Sale Overview
+        </h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+            <span class="text-[11px] font-medium text-slate-500 block">Total Items</span>
+            <span id="stat-total-items" class="text-base font-bold text-slate-800">--</span>
+          </div>
+          <div class="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+            <span class="text-[11px] font-medium text-slate-500 block">Total Invoiced</span>
+            <span id="stat-total-sales" class="text-base font-bold text-rose-600">--</span>
+          </div>
+          <div class="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+            <span class="text-[11px] font-medium text-slate-500 block">Total Finder's Fees</span>
+            <span id="stat-total-finders" class="text-base font-bold text-slate-800">--</span>
+          </div>
+          <div class="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+            <span class="text-[11px] font-medium text-slate-500 block">Total Sales Tax</span>
+            <span id="stat-total-taxes" class="text-base font-bold text-slate-800">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fee Config & Settings Accordion -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 text-xs space-y-3">
+        <h3 class="font-bold text-slate-700 flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><i class="ph-bold ph-gear text-slate-400"></i> Settings & Options</span>
+          <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">Automatic</span>
+        </h3>
+        <div class="space-y-2 text-slate-600">
+          <div class="flex items-center justify-between">
+            <span>Purchase Protection Rate</span>
+            <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">3.00%</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span>Payment Notes</span>
+            <span class="text-[11px] text-slate-500">Venmo / Zelle / PayPal</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Column: Interactive Invoice Preview -->
+    <section class="lg:col-span-8">
+      <!-- Toolbar for currently selected invoice -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3 bg-white p-2.5 rounded-xl border border-slate-200/70 shadow-2xs">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-600">Share / Export:</span>
+          <button id="btn-copy-messenger" class="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center gap-1.5 transition">
+            <i class="ph-bold ph-messenger-logo text-blue-600"></i> Copy for Messenger
+          </button>
+          <button id="btn-preview-messenger" class="px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition flex items-center gap-1">
+            <i class="ph-bold ph-eye"></i> Preview DM
+          </button>
+        </div>
+        <div class="text-xs text-slate-400 italic">
+          Invoice reflects exact spreadsheet records
+        </div>
+      </div>
+
+      <!-- Printable Invoice Sheet -->
+      <div id="invoice-printable" class="bg-white rounded-3xl border border-rose-100/80 shadow-md p-6 sm:p-10 relative overflow-hidden transition-all">
+        <!-- Watermark / decorative background banner -->
+        <div class="absolute -top-16 -right-16 w-52 h-52 bg-gradient-to-br from-rose-100/40 via-pink-100/30 to-transparent rounded-full pointer-events-none blur-2xl"></div>
+
+        <!-- Invoice Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-rose-100 gap-4">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-rose-50 text-rose-600 border border-rose-200/60 mb-2">
+              Sample Sale Purchase Invoice
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-bold font-serif-title text-slate-900 tracking-tight">Selkie Sample Sale</h2>
+            <p class="text-xs text-slate-500 mt-0.5">October Special Event Shopping & Procurement</p>
+          </div>
+          <div class="sm:text-right">
+            <div class="text-xs font-mono font-bold text-rose-600 uppercase tracking-wider" id="inv-number">INV-2026-0001</div>
+            <div class="text-xs text-slate-400 mt-1" id="inv-date">Date: October 12, 2026</div>
+            <span class="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Ready for Settlement
+            </span>
+          </div>
+        </div>
+
+        <!-- Buyer & Vendor Information Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 text-xs border-b border-slate-100">
+          <div class="bg-rose-50/40 p-4 rounded-2xl border border-rose-100/80">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700 block mb-1">Billed To</span>
+            <div class="text-base font-bold text-slate-900 break-words" id="inv-buyer-name">Loading buyer...</div>
+            <div class="text-slate-500 mt-1.5 text-[11px] space-y-0.5">
+              <p class="text-slate-600">Sample Sale Buyer Record</p>
+              <p class="text-amber-800 font-medium">Notice: Shipping is not included in this invoice</p>
+            </div>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex flex-col justify-between">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Procured At</span>
+              <div class="text-sm font-semibold text-slate-800">Selkie Sample Sale Event</div>
+              <p class="text-slate-500 mt-0.5">In-person boutique sample racks & exclusive archives</p>
+            </div>
+            <p class="text-[11px] text-slate-400 pt-2 border-t border-slate-200/50 mt-2">
+              All items verified on register receipts. All sales final.
+            </p>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="py-6 overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[600px]">
+            <thead>
+              <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <th class="py-3 px-2 w-10">#</th>
+                <th class="py-3 px-2">Item Name</th>
+                <th class="py-3 px-2">Receipt Name</th>
+                <th class="py-3 px-2 text-right">Cost</th>
+                <th class="py-3 px-2 text-right">Tax</th>
+                <th class="py-3 px-2 text-right">Finder's Fee</th>
+                <th class="py-3 px-2 text-right">Line Total</th>
+              </tr>
+            </thead>
+            <tbody id="invoice-items-body" class="divide-y divide-slate-100 text-xs">
+              <!-- Item rows injected dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Calculations & Fee Option Breakdown -->
+        <div class="pt-4 border-t border-slate-200">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            
+            <!-- Left Info Box: Explanation of Protection & Breakdown -->
+            <div class="md:col-span-6 space-y-3">
+              <div class="bg-amber-50/80 rounded-2xl p-4 border border-amber-200/80 text-xs text-amber-900">
+                <div class="flex items-center gap-1.5 font-bold mb-1">
+                  <i class="ph-bold ph-shield-check text-amber-700 text-base"></i>
+                  <span>Optional 3% Purchase Protection Fee</span>
+                </div>
+                <p class="text-[11px] text-amber-800 leading-relaxed">
+                  Buyers may elect to pay with standard <strong>Friends & Family</strong> (no fee) or add <strong>3% Purchase Protection</strong> for goods & services coverage via PayPal/Venmo buyer guarantee.
+                </p>
+              </div>
+
+              <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/70 text-xs text-slate-600">
+                <span class="font-bold text-slate-800 block mb-1">Payment Instructions</span>
+                <p class="text-[11px] leading-relaxed">
+                  Please send payment within 24 hours of receiving this statement. Include your <strong>Invoice #</strong> in the payment memo.
+                </p>
+              </div>
+            </div>
+
+            <!-- Right Calculation Totals Card -->
+            <div class="md:col-span-6 bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/80 space-y-2.5 text-xs">
+              <div class="flex justify-between text-slate-600">
+                <span>Items Subtotal (Cost)</span>
+                <span id="summary-subtotal" class="font-medium font-mono text-slate-900">$0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Total Taxes</span>
+                <span id="summary-tax" class="font-medium font-mono text-slate-900">$0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Total Finder's Fees</span>
+                <span id="summary-finders" class="font-medium font-mono text-slate-900">$0.00</span>
+              </div>
+
+              <!-- Standard Total -->
+              <div class="pt-3 border-t border-slate-200 flex justify-between items-baseline">
+                <div>
+                  <span class="text-sm font-bold text-slate-900 block">Total Price</span>
+                  <span class="text-[10px] text-slate-500">(Without Protection Fee)</span>
+                </div>
+                <span id="summary-standard-total" class="text-xl font-extrabold font-mono text-slate-900">$0.00</span>
+              </div>
+
+              <!-- With 3% Purchase Protection -->
+              <div class="pt-3 border-t border-rose-200/60 bg-rose-50/80 -mx-4 -mb-4 p-4 rounded-b-2xl flex justify-between items-baseline">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-bold text-rose-900">Total with 3% Protection</span>
+                    <span class="text-[9px] font-bold bg-rose-200 text-rose-800 uppercase px-1.5 py-0.5 rounded">Option</span>
+                  </div>
+                  <span class="text-[10px] text-rose-700 block" id="summary-fee-amount">+ $0.00 protection fee</span>
+                </div>
+                <span id="summary-protected-total" class="text-xl font-black font-mono text-rose-600">$0.00</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Footer Sign-off -->
+        <div class="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
+          Thank you for shopping the Selkie Sample Sale! 💕 We hope you adore your romantic & whimsical pieces!
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- CSV Import Modal -->
+<div id="modal-csv" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="flex justify-between items-center">
+      <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <i class="ph-bold ph-file-csv text-rose-500"></i> Import Purchases CSV
+      </h3>
+      <button id="modal-csv-close" class="text-slate-400 hover:text-slate-600 text-lg">
+        <i class="ph-bold ph-x"></i>
+      </button>
+    </div>
+    <p class="text-xs text-slate-500">
+      You can upload your sample sale file (e.g. <code>Selkie_Sample_Sale_Purchases_O_Orders.csv</code> or paste formatted raw CSV).
+    </p>
+
+    <!-- File Drop or Text Area -->
+    <div class="space-y-3">
+      <input type="file" id="csv-file-input" accept=".csv" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100">
+      <div class="text-center text-[10px] text-slate-400 uppercase font-bold tracking-wider">or paste CSV text directly</div>
+      <textarea id="csv-paste-area" rows="6" placeholder="Buyer,Item Name,Receipt Name,Cost,Tax,Finders Fee" class="w-full p-3 text-xs font-mono border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none"></textarea>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <button id="btn-cancel-csv" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+      <button id="btn-process-csv" class="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm">Load Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Custom Item Modal -->
+<div id="modal-add-item" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="flex justify-between items-center">
+      <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <i class="ph-bold ph-plus-circle text-rose-500"></i> Add Item to Buyer
+      </h3>
+      <button id="modal-add-close" class="text-slate-400 hover:text-slate-600 text-lg">
+        <i class="ph-bold ph-x"></i>
+      </button>
+    </div>
+
+    <form id="form-add-item" class="space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Buyer</label>
+        <select id="modal-buyer-select" class="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none"></select>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Item Name</label>
+        <input type="text" id="add-item-name" required placeholder="e.g., The French Puff Dress in Tea Rose" class="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Receipt Name / Tag Description</label>
+        <input type="text" id="add-receipt-name" required placeholder="e.g., DR-PUFF-TR-S / Sample Rack B" class="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none">
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Cost ($)</label>
+          <input type="number" step="0.01" min="0" id="add-item-cost" required placeholder="120.00" class="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tax ($)</label>
+          <input type="number" step="0.01" min="0" id="add-item-tax" required placeholder="11.40" class="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Finder's Fee ($)</label>
+          <input type="number" step="0.01" min="0" id="add-item-finder" required placeholder="25.00" class="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3">
+        <button type="button" id="btn-cancel-add" class="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+        <button type="submit" class="px-4 py-2 font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm">Add Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Notification Toast -->
+<div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-slate-800 hidden flex items-center gap-2 z-50">
+  <i class="ph-bold ph-check-circle text-emerald-400 text-base"></i>
+  <span id="toast-message">Notification</span>
+</div>
+
+<!-- Messenger Preview Modal -->
+<div id="modal-messenger" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
+          <i class="ph-bold ph-messenger-logo text-lg"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">Facebook Messenger Formatted Receipt</h3>
+          <p class="text-[11px] text-slate-500">Ready to copy and paste directly into chat</p>
+        </div>
+      </div>
+      <button id="modal-messenger-close" class="text-slate-400 hover:text-slate-600 text-lg">
+        <i class="ph-bold ph-x"></i>
+      </button>
+    </div>
+
+    <!-- Preview Bubble looking like Messenger -->
+    <div class="bg-slate-100 p-4 rounded-2xl border border-slate-200/80 max-h-96 overflow-y-auto font-sans text-xs">
+      <pre id="messenger-text-preview" class="whitespace-pre-wrap font-sans text-slate-800 leading-relaxed"></pre>
+    </div>
+
+    <div class="flex items-center justify-between pt-2">
+      <span class="text-[11px] text-slate-500">Includes full line items, options, and payment note.</span>
+      <div class="flex gap-2">
+        <button id="btn-close-messenger-modal" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Close</button>
+        <button id="btn-copy-messenger-modal" class="px-4 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-sm flex items-center gap-1.5">
+          <i class="ph-bold ph-copy"></i> Copy to Clipboard
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Generation Progress Overlay -->
+<div id="modal-bulk-progress" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+    <div class="w-12 h-12 mx-auto rounded-full bg-rose-50 text-rose-600 flex items-center justify-center animate-spin">
+      <i class="ph-bold ph-spinner-gap text-2xl"></i>
+    </div>
+    <div>
+      <h3 class="font-bold text-slate-900 text-base">Generating Invoices</h3>
+      <p id="bulk-progress-status" class="text-xs text-slate-500 mt-1">Preparing customer receipts...</p>
+    </div>
+    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+      <div id="bulk-progress-bar" class="bg-rose-500 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+    </div>
+  </div>
+</div>
+<script>
+// Initial representative seed dataset modeled strictly from spreadsheet records
+let purchases = [
+  {
+    buyer: "Emma Vance",
+    itemName: "The French Puff Dress in Pastel Clouds",
+    receiptName: "Selkie French Puff Dress - Pastel Clouds Sample",
+    cost: 115.00,
+    tax: 10.93,
+    findersFee: 25.00
+  },
+  {
+    buyer: "Emma Vance",
+    itemName: "The Renaissance Gown in Strawberry Field",
+    receiptName: "Selkie Renaissance Gown - Strawberry Field M",
+    cost: 165.00,
+    tax: 15.68,
+    findersFee: 30.00
+  },
+  {
+    buyer: "Sophia Chen",
+    itemName: "The Poet Blouse in Ivory Organza",
+    receiptName: "Selkie Poet Blouse Ivory Organza S Sample",
+    cost: 65.00,
+    tax: 6.18,
+    findersFee: 15.00
+  },
+  {
+    buyer: "Sophia Chen",
+    itemName: "The Castle Slip Skirt in Midnight",
+    receiptName: "Selkie Castle Slip Skirt Midnight S",
+    cost: 85.00,
+    tax: 8.08,
+    findersFee: 20.00
+  },
+  {
+    buyer: "Olivia Martinez",
+    itemName: "The Cottage Mini Dress in Lilac Garden",
+    receiptName: "Selkie Cottage Mini Dress Lilac Garden L",
+    cost: 95.00,
+    tax: 9.03,
+    findersFee: 20.00
+  },
+  {
+    buyer: "Olivia Martinez",
+    itemName: "The Cloud Capelet in Marshmallow",
+    receiptName: "Selkie Cloud Capelet Marshmallow OS",
+    cost: 50.00,
+    tax: 4.75,
+    findersFee: 15.00
+  },
+  {
+    buyer: "Olivia Martinez",
+    itemName: "Hair Ribbon Set in Rosy Satin",
+    receiptName: "Selkie Hair Ribbon Accessory Set Rose Satin",
+    cost: 18.00,
+    tax: 1.71,
+    findersFee: 5.00
+  },
+  {
+    buyer: "Chloe Bennett",
+    itemName: "The Ritz Ballgown in Frosted Lavender",
+    receiptName: "Selkie Ritz Ballgown Frosted Lavender XS Archive",
+    cost: 210.00,
+    tax: 19.95,
+    findersFee: 40.00
+  },
+  {
+    buyer: "Harper Davis",
+    itemName: "The Palace Corset in Bridal Bloom",
+    receiptName: "Selkie Palace Corset Bridal Bloom S Sample",
+    cost: 75.00,
+    tax: 7.13,
+    findersFee: 20.00
+  }
+];
+
+let selectedBuyerName = purchases[0].buyer;
+
+function formatCurrency(num) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(num || 0);
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  const label = document.getElementById('toast-message');
+  label.textContent = msg;
+  toast.classList.remove('hidden');
+  setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 2800);
+}
+
+function getUniqueBuyers() {
+  const buyerMap = new Map();
+  purchases.forEach(item => {
+    const rawName = item.buyer ? item.buyer.trim() : "Unknown Buyer";
+    if (!buyerMap.has(rawName)) {
+      buyerMap.set(rawName, {
+        name: rawName
+      });
+    }
+  });
+  return Array.from(buyerMap.values());
+}
+
+function updateOverviewStats() {
+  const totalItems = purchases.length;
+  const totalCost = purchases.reduce((acc, i) => acc + (Number(i.cost) || 0), 0);
+  const totalTax = purchases.reduce((acc, i) => acc + (Number(i.tax) || 0), 0);
+  const totalFinders = purchases.reduce((acc, i) => acc + (Number(i.findersFee) || 0), 0);
+  const grandTotal = totalCost + totalTax + totalFinders;
+
+  document.getElementById('stat-total-items').textContent = totalItems;
+  document.getElementById('stat-total-sales').textContent = formatCurrency(grandTotal);
+  document.getElementById('stat-total-finders').textContent = formatCurrency(totalFinders);
+  document.getElementById('stat-total-taxes').textContent = formatCurrency(totalTax);
+}
+
+function renderBuyerList(filterText = '') {
+  const listEl = document.getElementById('buyer-list');
+  listEl.innerHTML = '';
+
+  const buyers = getUniqueBuyers();
+  document.getElementById('buyer-count').textContent = buyers.length;
+
+  const filtered = buyers.filter(b => 
+    b.name.toLowerCase().includes(filterText.toLowerCase())
+  );
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div class="p-3 text-center text-xs text-slate-400">No buyers found</div>`;
+    return;
+  }
+
+  filtered.forEach(buyer => {
+    const buyerItems = purchases.filter(p => p.buyer === buyer.name);
+    const buyerTotal = buyerItems.reduce((acc, item) => 
+      acc + (Number(item.cost) || 0) + (Number(item.tax) || 0) + (Number(item.findersFee) || 0), 0);
+
+    const isSelected = buyer.name === selectedBuyerName;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `w-full text-left p-3 rounded-xl transition flex items-center justify-between group ${
+      isSelected 
+        ? 'bg-rose-50 border border-rose-200 text-rose-900 shadow-2xs font-semibold' 
+        : 'hover:bg-slate-50 border border-transparent text-slate-700'
+    }`;
+
+    button.innerHTML = `
+      <div class="truncate mr-2">
+        <div class="text-xs font-bold leading-tight truncate ${isSelected ? 'text-rose-900' : 'text-slate-800'}">${buyer.name}</div>
+        <div class="text-[11px] text-slate-400">${buyerItems.length} item${buyerItems.length > 1 ? 's' : ''}</div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="text-xs font-mono font-bold ${isSelected ? 'text-rose-600' : 'text-slate-800'}">${formatCurrency(buyerTotal)}</div>
+      </div>
+    `;
+
+    button.onclick = () => {
+      selectedBuyerName = buyer.name;
+      renderBuyerList(document.getElementById('buyer-search-input').value);
+      renderInvoice();
+    };
+
+    listEl.appendChild(button);
+  });
+}
+
+function renderInvoice() {
+  const buyerItems = purchases.filter(p => p.buyer === selectedBuyerName);
+  const buyerData = getUniqueBuyers().find(b => b.name === selectedBuyerName) || {
+    name: selectedBuyerName
+  };
+
+  // Populate header and exact buyer name from spreadsheet
+  document.getElementById('inv-buyer-name').textContent = buyerData.name;
+  
+  // Deterministic invoice ID based on buyer initials & timestamp
+  const initials = buyerData.name.split(/\s+/).map(n => n[0]).join('').toUpperCase() || 'SB';
+  document.getElementById('inv-number').textContent = `SELKIE-OCT-${initials}`;
+
+  const tbody = document.getElementById('invoice-items-body');
+  tbody.innerHTML = '';
+
+  let totalCost = 0;
+  let totalTax = 0;
+  let totalFinders = 0;
+
+  if (buyerItems.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="py-8 text-center text-xs text-slate-400 italic">
+          No items logged for this buyer yet.
+        </td>
+      </tr>
+    `;
+  } else {
+    buyerItems.forEach((item, index) => {
+      const cost = Number(item.cost) || 0;
+      const tax = Number(item.tax) || 0;
+      const finder = Number(item.findersFee) || 0;
+      const lineTotal = cost + tax + finder;
+
+      totalCost += cost;
+      totalTax += tax;
+      totalFinders += finder;
+
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-rose-50/30 transition-colors';
+      row.innerHTML = `
+        <td class="py-3 px-2 text-slate-400 font-mono align-top">${index + 1}</td>
+        <td class="py-3 px-2 font-medium text-slate-900 align-top break-words">
+          <span>${item.itemName}</span>
+        </td>
+        <td class="py-3 px-2 text-slate-600 font-medium text-xs align-top break-words">
+          <span class="bg-slate-100 px-2 py-1 rounded inline-block text-slate-700">${item.receiptName || 'N/A'}</span>
+        </td>
+        <td class="py-3 px-2 text-right font-mono text-slate-700 align-top">${formatCurrency(cost)}</td>
+        <td class="py-3 px-2 text-right font-mono text-slate-500 align-top">${formatCurrency(tax)}</td>
+        <td class="py-3 px-2 text-right font-mono text-emerald-700 font-medium align-top">${formatCurrency(finder)}</td>
+        <td class="py-3 px-2 text-right font-mono font-bold text-slate-900 align-top">${formatCurrency(lineTotal)}</td>
+      `;
+      tbody.appendChild(row);
+    });
+  }
+
+  // Calculate totals & 3% Purchase Protection Fee
+  const standardTotal = totalCost + totalTax + totalFinders;
+  const purchaseProtectionFee = standardTotal * 0.03;
+  const protectedTotal = standardTotal + purchaseProtectionFee;
+
+  // Update summary fields
+  document.getElementById('summary-subtotal').textContent = formatCurrency(totalCost);
+  document.getElementById('summary-tax').textContent = formatCurrency(totalTax);
+  document.getElementById('summary-finders').textContent = formatCurrency(totalFinders);
+
+  document.getElementById('summary-standard-total').textContent = formatCurrency(standardTotal);
+  document.getElementById('summary-fee-amount').textContent = `+ ${formatCurrency(purchaseProtectionFee)} protection fee`;
+  document.getElementById('summary-protected-total').textContent = formatCurrency(protectedTotal);
+
+  updateOverviewStats();
+}
+
+// Function to generate high quality formatted Facebook Messenger text
+function generateMessengerReceipt(buyerName) {
+  const buyerItems = purchases.filter(p => p.buyer === buyerName);
+  if (buyerItems.length === 0) return "";
+
+  let totalCost = 0;
+  let totalTax = 0;
+  let totalFinders = 0;
+
+  const initials = buyerName.split(/\s+/).map(n => n[0]).join('').toUpperCase() || 'SB';
+  const invoiceId = `SELKIE-OCT-${initials}`;
+
+  let msg = `🌸 𝗦𝗘𝗟𝗞𝗜𝗘 𝗦𝗔𝗠𝗣𝗟𝗘 𝗦𝗔𝗟𝗘 𝗜𝗡𝗩𝗢𝗜𝗖𝗘 🌸\n`;
+  msg += `─────────────────────────\n`;
+  msg += `👤 𝗕𝘂𝘆𝗲𝗿: ${buyerName}\n`;
+  msg += `🧾 𝗜𝗻𝘃𝗼𝗶𝗰𝗲 #: ${invoiceId}\n`;
+  msg += `⚠️ 𝗡𝗼𝘁𝗲: Shipping is not included in this invoice.\n`;
+  msg += `─────────────────────────\n\n`;
+  msg += `🛍️ 𝗜𝗧𝗘𝗠 𝗕𝗥𝗘𝗔𝗞𝗗𝗢𝗪𝗡:\n\n`;
+
+  buyerItems.forEach((item, idx) => {
+    const c = Number(item.cost) || 0;
+    const t = Number(item.tax) || 0;
+    const f = Number(item.findersFee) || 0;
+    const lineTotal = c + t + f;
+    totalCost += c;
+    totalTax += t;
+    totalFinders += f;
+
+    msg += `【${idx + 1}】 ${item.itemName}\n`;
+    msg += `  • Tag / Receipt: ${item.receiptName || 'N/A'}\n`;
+    msg += `  • Cost: $${c.toFixed(2)}  |  Tax: $${t.toFixed(2)}  |  Finder's: $${f.toFixed(2)}\n`;
+    msg += `  • Line Total: $${lineTotal.toFixed(2)}\n\n`;
+  });
+
+  const standardTotal = totalCost + totalTax + totalFinders;
+  const protectionFee = standardTotal * 0.03;
+  const protectedTotal = standardTotal + protectionFee;
+
+  msg += `─────────────────────────\n`;
+  msg += `📊 𝗦𝗨𝗠𝗠𝗔𝗥𝗬\n`;
+  msg += `• Items Subtotal: $${totalCost.toFixed(2)}\n`;
+  msg += `• Total Taxes: $${totalTax.toFixed(2)}\n`;
+  msg += `• Finder's Fees: $${totalFinders.toFixed(2)}\n\n`;
+  msg += `💳 𝗧𝗢𝗧𝗔𝗟 𝗗𝗨𝗘 (Standard / F&F):\n`;
+  msg += `   👉 $${standardTotal.toFixed(2)}\n\n`;
+  msg += `🛡️ 𝗢𝗣𝗧𝗜𝗢𝗡: With 3% Purchase Protection:\n`;
+  msg += `   👉 $${protectedTotal.toFixed(2)} (includes +$${protectionFee.toFixed(2)} fee)\n`;
+  msg += `─────────────────────────\n`;
+  msg += `✨ Thank you so much for shopping with us! Please send payment within 24 hours and include your invoice # in the payment memo 💕`;
+
+  return msg;
+}
+
+function copyText(str) {
+  const tempInput = document.createElement('textarea');
+  tempInput.value = str;
+  document.body.appendChild(tempInput);
+  tempInput.select();
+  document.execCommand('copy');
+  document.body.removeChild(tempInput);
+}
+
+// Messenger preview and copy triggers
+document.getElementById('btn-copy-messenger').addEventListener('click', () => {
+  const text = generateMessengerReceipt(selectedBuyerName);
+  copyText(text);
+  showToast("Receipt copied! Ready to paste into Facebook Messenger.");
+});
+
+const modalMessenger = document.getElementById('modal-messenger');
+const messengerTextPreview = document.getElementById('messenger-text-preview');
+document.getElementById('btn-preview-messenger').addEventListener('click', () => {
+  const text = generateMessengerReceipt(selectedBuyerName);
+  messengerTextPreview.textContent = text;
+  modalMessenger.classList.remove('hidden');
+});
+
+document.getElementById('modal-messenger-close').onclick = () => modalMessenger.classList.add('hidden');
+document.getElementById('btn-close-messenger-modal').onclick = () => modalMessenger.classList.add('hidden');
+document.getElementById('btn-copy-messenger-modal').onclick = () => {
+  copyText(messengerTextPreview.textContent);
+  showToast("Receipt copied to clipboard!");
+  modalMessenger.classList.add('hidden');
+};
+
+// Bulk PDF generation using html2canvas, jspdf, and JSZip
+document.getElementById('btn-bulk-pdf').addEventListener('click', async () => {
+  const buyers = getUniqueBuyers();
+  if (buyers.length === 0) {
+    showToast("No buyers found to generate invoices.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const zip = new JSZip();
+  const invoiceElement = document.getElementById('invoice-printable');
+  const originalSelectedBuyer = selectedBuyerName;
+
+  const progressModal = document.getElementById('modal-bulk-progress');
+  const progressBar = document.getElementById('bulk-progress-bar');
+  const progressStatus = document.getElementById('bulk-progress-status');
+
+  progressModal.classList.remove('hidden');
+
+  try {
+    for (let i = 0; i < buyers.length; i++) {
+      const buyer = buyers[i];
+      selectedBuyerName = buyer.name;
+      renderInvoice();
+
+      const percent = Math.round(((i + 1) / buyers.length) * 100);
+      progressBar.style.width = `${percent}%`;
+      progressStatus.textContent = `Rendering invoice for ${buyer.name} (${i + 1}/${buyers.length})...`;
+
+      // Wait a moment for DOM repainting
+      await new Promise(r => setTimeout(r, 120));
+
+      // Render invoice canvas
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      const pdfBlob = pdf.output('blob');
+
+      const safeName = buyer.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      zip.file(`Invoice_${safeName}.pdf`, pdfBlob);
+    }
+
+    progressStatus.textContent = "Packaging all PDFs into a ZIP archive...";
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    // Trigger download of zip
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = `Selkie_Sample_Sale_Invoices_${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    showToast(`Successfully downloaded all ${buyers.length} buyer invoices!`);
+  } catch (err) {
+    console.error(err);
+    showToast("Error creating bulk PDFs. Please try again.");
+  } finally {
+    progressModal.classList.add('hidden');
+    selectedBuyerName = originalSelectedBuyer;
+    renderInvoice();
+  }
+});
+
+const modalCsv = document.getElementById('modal-csv');
+const btnImportCsv = document.getElementById('btn-import-csv');
+const modalCsvClose = document.getElementById('modal-csv-close');
+const btnCancelCsv = document.getElementById('btn-cancel-csv');
+const btnProcessCsv = document.getElementById('btn-process-csv');
+const csvFileInput = document.getElementById('csv-file-input');
+const csvPasteArea = document.getElementById('csv-paste-area');
+
+btnImportCsv.onclick = () => {
+  modalCsv.classList.remove('hidden');
+};
+modalCsvClose.onclick = () => modalCsv.classList.add('hidden');
+btnCancelCsv.onclick = () => modalCsv.classList.add('hidden');
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r\n|\n/);
+  if (lines.length < 2) return [];
+
+  // Parse header
+  const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[\"\'\s_-]/g, ''));
+  
+  // Find column indices
+  const getIdx = (keys) => header.findIndex(h => keys.some(k => h.includes(k)));
+
+  const buyerIdx = getIdx(['buyer', 'customer', 'name', 'client']);
+  const itemIdx = getIdx(['itemname', 'item', 'product', 'description', 'title']);
+  const receiptIdx = getIdx(['receiptname', 'receipt', 'tag', 'sku', 'code']);
+  const costIdx = getIdx(['cost', 'price', 'retail', 'subtotal']);
+  const taxIdx = getIdx(['tax', 'vat']);
+  const findersIdx = getIdx(['findersfee', 'finder', 'fee', 'commission']);
+
+  // Robust CSV split respecting quotes
+  function splitCSVRow(rowStr) {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < rowStr.length; i++) {
+      const char = rowStr[i];
+      if (char === '"' || char === "'") {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    return values.map(v => v.replace(/^["']|["']$/g, '').trim());
+  }
+
+  const parsed = [];
+  for (let i = 1; i < lines.length; i++) {
+    const rawLine = lines[i].trim();
+    if (!rawLine) continue;
+
+    const clean = splitCSVRow(rawLine);
+
+    const buyer = (buyerIdx !== -1 ? clean[buyerIdx] : clean[0]) || 'Unknown Buyer';
+    const itemName = (itemIdx !== -1 ? clean[itemIdx] : clean[1]) || 'Sample Sale Item';
+    const receiptName = (receiptIdx !== -1 ? clean[receiptIdx] : clean[2]) || 'REG-TAG';
+    
+    // Parse numbers safely
+    const parseNum = (val) => {
+      if (!val) return 0;
+      const num = parseFloat(val.replace(/[^0-9.-]+/g, ""));
+      return isNaN(num) ? 0 : num;
+    };
+
+    const cost = costIdx !== -1 ? parseNum(clean[costIdx]) : parseNum(clean[3]);
+    const tax = taxIdx !== -1 ? parseNum(clean[taxIdx]) : parseNum(clean[4]);
+    const findersFee = findersIdx !== -1 ? parseNum(clean[findersIdx]) : parseNum(clean[5]);
+
+    parsed.push({
+      buyer: buyer.trim(),
+      itemName: itemName.trim(),
+      receiptName: receiptName.trim(),
+      cost,
+      tax,
+      findersFee
+    });
+  }
+  return parsed;
+}
+
+btnProcessCsv.onclick = () => {
+  const pasteContent = csvPasteArea.value;
+  if (pasteContent.trim()) {
+    const data = parseCSV(pasteContent);
+    if (data.length > 0) {
+      purchases = data;
+      selectedBuyerName = data[0].buyer;
+      modalCsv.classList.add('hidden');
+      renderBuyerList();
+      renderInvoice();
+      showToast(`Loaded ${data.length} records from text.`);
+      return;
+    }
+  }
+
+  const file = csvFileInput.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = parseCSV(e.target.result);
+      if (data.length > 0) {
+        purchases = data;
+        selectedBuyerName = data[0].buyer;
+        modalCsv.classList.add('hidden');
+        renderBuyerList();
+        renderInvoice();
+        showToast(`Imported ${data.length} purchase items.`);
+      } else {
+        showToast("No valid purchase rows detected in CSV.");
+      }
+    };
+    reader.readAsText(file);
+  } else {
+    showToast("Please provide CSV content or select a file.");
+  }
+};
+
+const modalAddItem = document.getElementById('modal-add-item');
+const btnAddItemModal = document.getElementById('btn-add-item-modal');
+const modalAddClose = document.getElementById('modal-add-close');
+const btnCancelAdd = document.getElementById('btn-cancel-add');
+const formAddItem = document.getElementById('form-add-item');
+const modalBuyerSelect = document.getElementById('modal-buyer-select');
+
+btnAddItemModal.onclick = () => {
+  modalBuyerSelect.innerHTML = '';
+  getUniqueBuyers().forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.name;
+    opt.textContent = b.name;
+    if (b.name === selectedBuyerName) opt.selected = true;
+    modalBuyerSelect.appendChild(opt);
+  });
+  
+  const newOpt = document.createElement('option');
+  newOpt.value = "__NEW__";
+  newOpt.textContent = "+ Create New Buyer";
+  modalBuyerSelect.appendChild(newOpt);
+
+  modalAddItem.classList.remove('hidden');
+};
+
+modalAddClose.onclick = () => modalAddItem.classList.add('hidden');
+btnCancelAdd.onclick = () => modalAddItem.classList.add('hidden');
+
+formAddItem.onsubmit = (e) => {
+  e.preventDefault();
+  let buyerName = modalBuyerSelect.value;
+  if (buyerName === '__NEW__') {
+    const promptName = prompt("Enter new buyer name:");
+    if (!promptName || !promptName.trim()) return;
+    buyerName = promptName.trim();
+  }
+
+  const newItem = {
+    buyer: buyerName.trim(),
+    itemName: document.getElementById('add-item-name').value.trim(),
+    receiptName: document.getElementById('add-receipt-name').value.trim(),
+    cost: parseFloat(document.getElementById('add-item-cost').value) || 0,
+    tax: parseFloat(document.getElementById('add-item-tax').value) || 0,
+    findersFee: parseFloat(document.getElementById('add-item-finder').value) || 0
+  };
+
+  purchases.push(newItem);
+  selectedBuyerName = buyerName;
+  formAddItem.reset();
+  modalAddItem.classList.add('hidden');
+  renderBuyerList();
+  renderInvoice();
+  showToast("Item added successfully!");
+};
+
+// Search filter
+document.getElementById('buyer-search-input').addEventListener('input', (e) => {
+  renderBuyerList(e.target.value);
+});
+
+window.onload = function() {
+  renderBuyerList();
+  renderInvoice();
+};
+</script>
+</body>
+</html>
