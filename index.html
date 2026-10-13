@@ -647,6 +647,11 @@ let purchases = [
 ];
 
 let selectedBuyerName = purchases[0].buyer;
+const invoiceThemeSelect = document.getElementById('invoice-theme');
+invoiceThemeSelect.addEventListener('change', () => {
+  document.getElementById('invoice-printable').dataset.theme = invoiceThemeSelect.value;
+});
+
 const paymentMethods = {
   venmo: '',
   paypal: ''
