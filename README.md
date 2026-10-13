@@ -28,7 +28,9 @@ Select **Load Custom CSV** and upload a `.csv` file or paste CSV text. Include a
 | `Tax` | Sales tax |
 | `Finders Fee` | Finder’s fee |
 
-The app also recognizes common header variations such as `Customer`, `Product`, `Receipt`, `Price`, and `Commission`. Importing data replaces the current purchase list.
+The app also recognizes common header variations such as `Customer`, `Product`, `Receipt`, `Price`, and `Commission`, including reordered columns. Buyer, item name, and cost are required; omitted tax and finder’s fee columns default to zero. Amounts must be non-negative with at most two decimal places; dollar signs and properly grouped thousands separators are accepted. Standard CSV double quoting supports commas, escaped quotes, and multiline fields.
+
+Importing valid data replaces the current purchase list and clears the buyer search. Invalid records leave the existing purchases unchanged and display an error. Invoice and Messenger totals share the same cent-rounded protection fee, and invoice numbers include a buyer sequence to distinguish buyers with the same initials. Bulk PDF exports include all pages of long invoices and use distinct filenames for buyers whose names sanitize to the same filename.
 
 ## Data and privacy
 
@@ -37,3 +39,7 @@ Purchases are held in browser memory and are not saved by the app; adding or imp
 ## Deploy
 
 The included GitHub Actions workflow deploys the static site to GitHub Pages when changes are pushed to `main`. It can also be started manually from the repository’s Actions tab. Configure GitHub Pages to use GitHub Actions if it is not already enabled.
+
+## Tests
+
+Run `node --test tests/app.test.cjs` with a modern Node.js version. The regression tests use only Node’s built-in modules; no package installation is required.
