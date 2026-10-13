@@ -8,7 +8,7 @@ A browser-based tool for organizing sample-sale purchases and creating buyer inv
 - Add purchase items or import a custom CSV.
 - Set Venmo and PayPal details for invoices.
 - Copy or preview a Messenger-ready invoice message.
-- Export Messenger invoice details to CSV, or download all buyer Messenger receipts in a single text file.
+- Export Messenger invoice details to CSV, or download all buyer Messenger receipts as individual text files in a ZIP archive.
 - Print or save the selected invoice as a PDF, or download all buyer invoices as a ZIP of PDFs.
 
 ## Run locally
