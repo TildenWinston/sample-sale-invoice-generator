@@ -65,6 +65,10 @@
         <i class="ph-bold ph-file-csv text-sm"></i>
         <span>Load Custom CSV</span>
       </button>
+      <button id="btn-bulk-messenger" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-sm">
+        <i class="ph-bold ph-messenger-logo text-sm"></i>
+        <span id="bulk-messenger-btn-text">Bulk Messenger (TXT)</span>
+      </button>
       <button id="btn-bulk-pdf" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1.5 shadow-sm">
         <i class="ph-bold ph-archive text-sm"></i>
         <span id="bulk-btn-text">Bulk Download All PDFs</span>
@@ -168,6 +172,9 @@
           </button>
           <button id="btn-export-messenger-csv" class="px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 border border-emerald-200 rounded-lg transition flex items-center gap-1">
             <i class="ph-bold ph-file-csv"></i> Export All Messenger CSV
+          </button>
+          <button id="btn-export-messenger-txt" class="px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 border border-blue-200 rounded-lg transition flex items-center gap-1">
+            <i class="ph-bold ph-file-text"></i> Export All Messenger TXT
           </button>
         </div>
         <div class="text-xs text-slate-400 italic">
@@ -818,6 +825,38 @@ document.getElementById('btn-export-messenger-csv').addEventListener('click', ()
   setTimeout(() => URL.revokeObjectURL(url), 0);
   showToast(`Exported Messenger receipts for ${buyers.length} buyers.`);
 });
+
+function exportBulkMessengerTxt() {
+  const buyers = getUniqueBuyers();
+  if (buyers.length === 0) {
+    showToast("No buyers found to export.");
+    return;
+  }
+
+  const receipts = buyers
+    .map(buyer => generateMessengerReceipt(buyer.name))
+    .filter(text => text.trim().length > 0);
+
+  if (receipts.length === 0) {
+    showToast("No Messenger receipts to export.");
+    return;
+  }
+
+  // Include space between entries to make copying easy
+  const content = receipts.join('\n\n\n\n') + '\n';
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Selkie_Sample_Sale_Messenger_Receipts_${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  showToast(`Exported Messenger receipts for ${receipts.length} buyers.`);
+}
+
+document.getElementById('btn-export-messenger-txt')?.addEventListener('click', exportBulkMessengerTxt);
+document.getElementById('btn-bulk-messenger')?.addEventListener('click', exportBulkMessengerTxt);
 
 const modalMessenger = document.getElementById('modal-messenger');
 const messengerTextPreview = document.getElementById('messenger-text-preview');
