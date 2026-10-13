@@ -157,6 +157,9 @@ test('clipboard failure and missing PDF dependencies are reported without succes
   await elements.get('btn-bulk-pdf').listeners.click();
   assert.match(elements.get('toast-message').textContent, /libraries are not loaded/);
   assert.equal(app.document.getElementById('modal-bulk-progress').classList.contains('hidden'), true);
+  elements.get('toast-message').textContent = '';
+  await elements.get('btn-print-pdf').listeners.click();
+  assert.match(elements.get('toast-message').textContent, /libraries are not loaded/);
 });
 
 test('bulk PDFs contain every canvas slice, keep colliding buyers, and restore selection', async () => {
@@ -214,3 +217,88 @@ test('bulk PDF rendering failures restore the buyer and dismiss progress', async
   assert.equal(elements.get('modal-bulk-progress').classList.contains('hidden'), true);
   assert.match(elements.get('toast-message').textContent, /Error creating bulk PDFs/);
 });
+
+test('individual invoice PDF uses shared generation engine, paginates smoothly, and downloads file', async () => {
+  const { app, elements } = createApp();
+  const pdfs = [];
+  let downloadedFile = null;
+  app.window.jspdf = {
+    jsPDF: class {
+      constructor() {
+        this.images = [];
+        this.pages = 1;
+        this.internal = { pageSize: { getWidth: () => 210, getHeight: () => 297 } };
+        pdfs.push(this);
+      }
+      addPage() { this.pages++; }
+      addImage(...args) { this.images.push(args); }
+      output() { return new Blob(['pdf']); }
+    }
+  };
+  app.downloadBlob = (blob, name) => {
+    downloadedFile = name;
+  };
+  app.html2canvas = async () => ({ width: 100, height: 400 });
+  const createElement = app.document.createElement;
+  const slices = [];
+  app.document.createElement = tag => {
+    if (tag !== 'canvas') return createElement();
+    return {
+      getContext() { return { drawImage(...args) { slices.push(args.slice(1, 5)); } }; },
+      toDataURL() { return 'data:image/jpeg;base64,test'; }
+    };
+  };
+
+  await elements.get('btn-print-pdf').listeners.click();
+  assert.equal(pdfs.length, 1);
+  assert.equal(pdfs[0].pages, 3);
+  assert.equal(pdfs[0].images.length, 3);
+  assert.deepEqual(slices, [[0, 0, 100, 141], [0, 141, 100, 141], [0, 282, 100, 118]]);
+  assert.equal(downloadedFile, 'Invoice_Emma_Vance.pdf');
+  assert.match(elements.get('toast-message').textContent, /Successfully downloaded invoice/);
+});
+
+test('individual invoice PDF handles rendering errors gracefully', async () => {
+  const { app, elements } = createApp();
+  app.console = { error() {} };
+  app.window.jspdf = { jsPDF: class {} };
+  app.html2canvas = async () => { throw new Error('Canvas rendering error'); };
+  await elements.get('btn-print-pdf').listeners.click();
+  assert.match(elements.get('toast-message').textContent, /Error creating invoice PDF/);
+  assert.equal(elements.get('btn-print-pdf').disabled, false);
+});
+
+test('individual invoice PDF can generate for a non-selected buyer and restores selection', async () => {
+  const { app, elements } = createApp();
+  let downloadedFile = null;
+  app.window.jspdf = {
+    jsPDF: class {
+      constructor() {
+        this.images = [];
+        this.pages = 1;
+        this.internal = { pageSize: { getWidth: () => 210, getHeight: () => 297 } };
+      }
+      addPage() { this.pages++; }
+      addImage() {}
+      output() { return new Blob(['pdf']); }
+    }
+  };
+  app.downloadBlob = (blob, name) => {
+    downloadedFile = name;
+  };
+  app.html2canvas = async () => ({ width: 100, height: 100 });
+  const createElement = app.document.createElement;
+  app.document.createElement = tag => {
+    if (tag !== 'canvas') return createElement();
+    return {
+      getContext() { return { drawImage() {} }; },
+      toDataURL() { return 'data:image/jpeg;base64,test'; }
+    };
+  };
+
+  assert.equal(elements.get('inv-buyer-name').textContent, 'Emma Vance');
+  await app.printOrSaveInvoicePDF('Olivia Martinez');
+  assert.equal(downloadedFile, 'Invoice_Olivia_Martinez.pdf');
+  assert.equal(elements.get('inv-buyer-name').textContent, 'Emma Vance');
+});
+

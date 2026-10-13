@@ -174,9 +174,9 @@
         <i class="ph-bold ph-archive text-sm"></i>
         <span id="bulk-btn-text">Bulk Download All PDFs</span>
       </button>
-      <button onclick="window.print()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-sm">
+      <button id="btn-print-pdf" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-sm">
         <i class="ph-bold ph-printer text-sm"></i>
-        <span>Print / Save PDF</span>
+        <span id="print-btn-text">Print / Save PDF</span>
       </button>
     </div>
   </div>
@@ -1080,6 +1080,94 @@ document.getElementById('btn-copy-messenger-modal').onclick = async () => {
   }
 };
 
+// Shared invoice PDF generation engine using html2canvas and jspdf
+async function generateInvoicePDF(invoiceElement = document.getElementById('invoice-printable')) {
+  if (!window.jspdf?.jsPDF || typeof html2canvas === 'undefined') {
+    throw new Error('PDF libraries are not loaded');
+  }
+  if (document.fonts?.ready) await document.fonts.ready;
+
+  const canvas = await html2canvas(invoiceElement, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    windowWidth: 1200,
+    onclone: clonedDocument => {
+      const invoice = invoiceElement?.id
+        ? clonedDocument.getElementById(invoiceElement.id)
+        : clonedDocument.getElementById('invoice-printable');
+      if (invoice) {
+        Object.assign(invoice.style, {
+          width: '794px', padding: '40px', boxSizing: 'border-box',
+          position: 'absolute', left: '0', top: '0', transition: 'none'
+        });
+      }
+    }
+  });
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pagePixelHeight = Math.max(1, Math.floor(canvas.width * pdf.internal.pageSize.getHeight() / pdfWidth));
+  const pageCanvas = document.createElement('canvas');
+  pageCanvas.width = canvas.width;
+  for (let offset = 0; offset < canvas.height; offset += pagePixelHeight) {
+    pageCanvas.height = Math.min(pagePixelHeight, canvas.height - offset);
+    pageCanvas.getContext('2d').drawImage(canvas,
+      0, offset, canvas.width, pageCanvas.height,
+      0, 0, canvas.width, pageCanvas.height);
+    if (offset > 0) pdf.addPage();
+    pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+      0, 0, pdfWidth, pageCanvas.height * pdfWidth / canvas.width);
+  }
+  return pdf;
+}
+
+// Individual invoice Print / Save PDF
+async function printOrSaveInvoicePDF(buyerName = selectedBuyerName) {
+  const targetBuyer = buyerName || selectedBuyerName;
+  if (!targetBuyer || !buyersByName.has(targetBuyer)) {
+    showToast("No buyer selected to generate invoice.");
+    return;
+  }
+
+  if (!window.jspdf?.jsPDF || typeof html2canvas === 'undefined') {
+    showToast('PDF libraries are not loaded. Please check your connection.');
+    return;
+  }
+
+  const invoiceElement = document.getElementById('invoice-printable');
+  const originalSelectedBuyer = selectedBuyerName;
+  const btnPrintPdf = document.getElementById('btn-print-pdf');
+  if (btnPrintPdf) btnPrintPdf.disabled = true;
+
+  try {
+    if (targetBuyer !== selectedBuyerName) {
+      selectedBuyerName = targetBuyer;
+      renderInvoice();
+      await new Promise(r => setTimeout(r, 120));
+    }
+    const pdf = await generateInvoicePDF(invoiceElement);
+    const pdfBlob = pdf.output('blob');
+    const fileName = getArchiveFileName(targetBuyer, 'Invoice', 'pdf', new Set());
+    downloadBlob(pdfBlob, fileName);
+    showToast(`Successfully downloaded invoice for ${targetBuyer}!`);
+    return pdf;
+  } catch (err) {
+    console.error(err);
+    showToast("Error creating invoice PDF. Please try again.");
+  } finally {
+    if (btnPrintPdf) btnPrintPdf.disabled = false;
+    if (selectedBuyerName !== originalSelectedBuyer) {
+      selectedBuyerName = originalSelectedBuyer;
+      renderInvoice();
+    }
+  }
+}
+
+document.getElementById('btn-print-pdf')?.addEventListener('click', () => printOrSaveInvoicePDF());
+
 // Bulk PDF generation using html2canvas, jspdf, and JSZip
 document.getElementById('btn-bulk-pdf').addEventListener('click', async () => {
   const buyers = getUniqueBuyers();
@@ -1092,7 +1180,6 @@ document.getElementById('btn-bulk-pdf').addEventListener('click', async () => {
     showToast('PDF libraries are not loaded. Please check your connection.');
     return;
   }
-  const { jsPDF } = window.jspdf;
   const invoiceElement = document.getElementById('invoice-printable');
   const originalSelectedBuyer = selectedBuyerName;
 
@@ -1119,36 +1206,8 @@ document.getElementById('btn-bulk-pdf').addEventListener('click', async () => {
       // Wait a moment for DOM repainting
       await new Promise(r => setTimeout(r, 120));
 
-      // Render invoice canvas
-      const canvas = await html2canvas(invoiceElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1200,
-        onclone: clonedDocument => {
-          const invoice = clonedDocument.getElementById('invoice-printable');
-          Object.assign(invoice.style, {
-            width: '794px', padding: '40px', boxSizing: 'border-box',
-            position: 'absolute', left: '0', top: '0', transition: 'none'
-          });
-        }
-      });
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pagePixelHeight = Math.floor(canvas.width * pdf.internal.pageSize.getHeight() / pdfWidth);
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      for (let offset = 0; offset < canvas.height; offset += pagePixelHeight) {
-        pageCanvas.height = Math.min(pagePixelHeight, canvas.height - offset);
-        pageCanvas.getContext('2d').drawImage(canvas,
-          0, offset, canvas.width, pageCanvas.height,
-          0, 0, canvas.width, pageCanvas.height);
-        if (offset > 0) pdf.addPage();
-        pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG',
-          0, 0, pdfWidth, pageCanvas.height * pdfWidth / canvas.width);
-      }
+      // Render invoice canvas and create PDF using shared generation engine
+      const pdf = await generateInvoicePDF(invoiceElement);
       const pdfBlob = pdf.output('blob');
 
       zip.file(getArchiveFileName(buyer.name, 'Invoice', 'pdf', usedNames), pdfBlob);

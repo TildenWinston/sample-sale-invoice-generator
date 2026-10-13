@@ -30,7 +30,7 @@ Select **Load Custom CSV** and upload a `.csv` file or paste CSV text. Include a
 
 The app also recognizes common header variations such as `Customer`, `Product`, `Receipt`, `Price`, and `Commission`, including reordered columns. Buyer, item name, and cost are required; omitted tax and finder’s fee columns default to zero. Amounts must be non-negative with at most two decimal places; dollar signs and properly grouped thousands separators are accepted. Standard CSV double quoting supports commas, escaped quotes, and multiline fields.
 
-Importing valid data replaces the current purchase list and clears the buyer search. Invalid records leave the existing purchases unchanged and display an error. Invoice and Messenger totals share the same cent-rounded protection fee, and invoice numbers include a buyer sequence to distinguish buyers with the same initials. Bulk PDF exports include all pages of long invoices and use distinct filenames for buyers whose names sanitize to the same filename.
+Importing valid data replaces the current purchase list and clears the buyer search. Invalid records leave the existing purchases unchanged and display an error. Invoice and Messenger totals share the same cent-rounded protection fee, and invoice numbers include a buyer sequence to distinguish buyers with the same initials. Individual and bulk PDF exports include all pages of long invoices and use distinct filenames for buyers whose names sanitize to the same filename.
 
 ## Data and privacy
 
