@@ -14,7 +14,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
 
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
@@ -22,6 +22,107 @@
 
     .font-serif-title {
       font-family: 'Playfair Display', Georgia, serif;
+    }
+
+    #invoice-printable {
+      --theme-accent: #c34d70;
+      --theme-accent-dark: #8e3452;
+      --theme-soft: #fff2f6;
+      --theme-border: #f4d4df;
+      --theme-paper: #fffdfd;
+      --theme-note: #fff5e9;
+      --theme-title-font: 'Playfair Display', Georgia, serif;
+    }
+
+    #invoice-printable[data-theme="strawberry"] {
+      --theme-accent: #ad365c;
+      --theme-accent-dark: #78233f;
+      --theme-soft: #fff0f1;
+      --theme-border: #f1c7cf;
+      --theme-paper: #fffafa;
+      --theme-note: #fff4e5;
+      --theme-title-font: 'Playfair Display', Georgia, serif;
+    }
+
+    #invoice-printable[data-theme="lavender"] {
+      --theme-accent: #7957a6;
+      --theme-accent-dark: #563b7c;
+      --theme-soft: #f5efff;
+      --theme-border: #ddcef1;
+      --theme-paper: #fefcff;
+      --theme-note: #faf4ff;
+      --theme-title-font: 'Cormorant Garamond', Georgia, serif;
+    }
+
+    #invoice-printable[data-theme="garden"] {
+      --theme-accent: #557c6d;
+      --theme-accent-dark: #365b4d;
+      --theme-soft: #edf6f0;
+      --theme-border: #c9dfd1;
+      --theme-paper: #fcfefa;
+      --theme-note: #f5f4e9;
+      --theme-title-font: 'Cormorant Garamond', Georgia, serif;
+    }
+
+    #invoice-printable[data-theme] {
+      background-color: var(--theme-paper);
+      border-color: var(--theme-border);
+    }
+
+    #invoice-printable[data-theme] .invoice-decoration {
+      background-image: radial-gradient(circle at center, var(--theme-border), transparent 70%);
+    }
+
+    #invoice-printable[data-theme] .invoice-kicker,
+    #invoice-printable[data-theme] .invoice-buyer-card,
+    #invoice-printable[data-theme] .invoice-highlight-total {
+      background-color: var(--theme-soft);
+      border-color: var(--theme-border);
+    }
+
+    #invoice-printable[data-theme] .invoice-kicker,
+    #invoice-printable[data-theme] .invoice-accent {
+      color: var(--theme-accent);
+    }
+
+    #invoice-printable[data-theme] .invoice-buyer-label,
+    #invoice-printable[data-theme] .invoice-highlight-label {
+      color: var(--theme-accent-dark);
+    }
+
+    #invoice-printable[data-theme] .invoice-title {
+      font-family: var(--theme-title-font);
+    }
+
+    #invoice-printable[data-theme] .invoice-header,
+    #invoice-printable[data-theme] .invoice-section-divider,
+    #invoice-printable[data-theme] .invoice-table-head {
+      border-color: var(--theme-border);
+    }
+
+    #invoice-printable[data-theme] .invoice-vendor-card,
+    #invoice-printable[data-theme] .invoice-payment,
+    #invoice-printable[data-theme] .invoice-totals {
+      background-color: var(--theme-soft);
+      border-color: var(--theme-border);
+    }
+
+    #invoice-printable[data-theme] .invoice-protection {
+      background-color: var(--theme-note);
+      border-color: var(--theme-border);
+      color: var(--theme-accent-dark);
+    }
+
+    #invoice-printable[data-theme] .invoice-highlight-total {
+      border-color: var(--theme-border);
+    }
+
+    #invoice-printable[data-theme] .invoice-highlight-amount {
+      color: var(--theme-accent);
+    }
+
+    #invoice-printable[data-theme] .invoice-footer {
+      border-color: var(--theme-border);
     }
 
     @media print {
@@ -182,22 +283,33 @@
         </div>
       </div>
 
+      <div class="no-print flex flex-wrap items-center gap-2 mb-3 px-1">
+        <label for="invoice-theme" class="text-xs font-semibold text-slate-600">Invoice mood</label>
+        <select id="invoice-theme" class="px-3 py-1.5 text-xs font-semibold text-rose-800 bg-white border border-rose-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-300">
+          <option value="romance">Rosewater Romance</option>
+          <option value="strawberry">Strawberry Picnic</option>
+          <option value="lavender">Lavender Daydream</option>
+          <option value="garden">Moonlit Garden</option>
+        </select>
+        <span class="text-[11px] text-slate-400">Choose a look for your preview and PDFs</span>
+      </div>
+
       <!-- Printable Invoice Sheet -->
-      <div id="invoice-printable" class="bg-white rounded-3xl border border-rose-100/80 shadow-md p-6 sm:p-10 relative overflow-hidden transition-all">
+      <div id="invoice-printable" data-theme="romance" class="bg-white rounded-3xl border border-rose-100/80 shadow-md p-6 sm:p-10 relative overflow-hidden transition-all">
         <!-- Watermark / decorative background banner -->
-        <div class="absolute -top-16 -right-16 w-52 h-52 bg-gradient-to-br from-rose-100/40 via-pink-100/30 to-transparent rounded-full pointer-events-none blur-2xl"></div>
+        <div class="invoice-decoration absolute -top-16 -right-16 w-52 h-52 bg-gradient-to-br from-rose-100/40 via-pink-100/30 to-transparent rounded-full pointer-events-none blur-2xl"></div>
 
         <!-- Invoice Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-rose-100 gap-4">
+        <div class="invoice-header flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-rose-100 gap-4">
           <div>
-            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-rose-50 text-rose-600 border border-rose-200/60 mb-2">
+            <div class="invoice-kicker inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-rose-50 text-rose-600 border border-rose-200/60 mb-2">
               Sample Sale Purchase Invoice
             </div>
-            <h2 class="text-2xl sm:text-3xl font-bold font-serif-title text-slate-900 tracking-tight">Selkie Sample Sale</h2>
+            <h2 class="invoice-title text-2xl sm:text-3xl font-bold font-serif-title text-slate-900 tracking-tight">Selkie Sample Sale</h2>
             <p class="text-xs text-slate-500 mt-0.5">October Special Event Shopping & Procurement</p>
           </div>
           <div class="sm:text-right">
-            <div class="text-xs font-mono font-bold text-rose-600 uppercase tracking-wider" id="inv-number">INV-2026-0001</div>
+            <div class="invoice-accent text-xs font-mono font-bold text-rose-600 uppercase tracking-wider" id="inv-number">INV-2026-0001</div>
             <div class="text-xs text-slate-400 mt-1" id="inv-date">Date: October 12, 2026</div>
             <span class="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Ready for Settlement
@@ -206,16 +318,16 @@
         </div>
 
         <!-- Buyer & Vendor Information Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 text-xs border-b border-slate-100">
-          <div class="bg-rose-50/40 p-4 rounded-2xl border border-rose-100/80">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700 block mb-1">Billed To</span>
+        <div class="invoice-section-divider grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 text-xs border-b border-slate-100">
+          <div class="invoice-buyer-card bg-rose-50/40 p-4 rounded-2xl border border-rose-100/80">
+            <span class="invoice-buyer-label text-[10px] font-bold uppercase tracking-wider text-rose-700 block mb-1">Billed To</span>
             <div class="text-base font-bold text-slate-900 break-words" id="inv-buyer-name">Loading buyer...</div>
             <div class="text-slate-500 mt-1.5 text-[11px] space-y-0.5">
               <p class="text-slate-600">Sample Sale Buyer Record</p>
               <p class="text-amber-800 font-medium">Notice: Shipping is not included in this invoice</p>
             </div>
           </div>
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex flex-col justify-between">
+          <div class="invoice-vendor-card bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex flex-col justify-between">
             <div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Procured At</span>
               <div class="text-sm font-semibold text-slate-800">Selkie Sample Sale Event</div>
@@ -231,7 +343,7 @@
         <div class="py-6 overflow-x-auto">
           <table class="w-full text-left border-collapse min-w-[600px]">
             <thead>
-              <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr class="invoice-table-head border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <th class="py-3 px-2 w-10">#</th>
                 <th class="py-3 px-2">Item Name</th>
                 <th class="py-3 px-2">Receipt Name</th>
@@ -248,12 +360,12 @@
         </div>
 
         <!-- Calculations & Fee Option Breakdown -->
-        <div class="pt-4 border-t border-slate-200">
+        <div class="invoice-section-divider pt-4 border-t border-slate-200">
           <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
             
             <!-- Left Info Box: Explanation of Protection & Breakdown -->
             <div class="md:col-span-6 space-y-3">
-              <div class="bg-amber-50/80 rounded-2xl p-4 border border-amber-200/80 text-xs text-amber-900">
+              <div class="invoice-protection bg-amber-50/80 rounded-2xl p-4 border border-amber-200/80 text-xs text-amber-900">
                 <div class="flex items-center gap-1.5 font-bold mb-1">
                   <i class="ph-bold ph-shield-check text-amber-700 text-base"></i>
                   <span>Optional 3% Purchase Protection Fee</span>
@@ -263,7 +375,7 @@
                 </p>
               </div>
 
-              <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/70 text-xs text-slate-600">
+              <div class="invoice-payment bg-slate-50 rounded-2xl p-4 border border-slate-200/70 text-xs text-slate-600">
                 <span class="font-bold text-slate-800 block mb-1">Payment Instructions</span>
                 <p class="text-[11px] leading-relaxed">
                   Include your <strong>Invoice #</strong> in the payment memo.
@@ -275,7 +387,7 @@
             </div>
 
             <!-- Right Calculation Totals Card -->
-            <div class="md:col-span-6 bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/80 space-y-2.5 text-xs">
+            <div class="invoice-totals md:col-span-6 bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/80 space-y-2.5 text-xs">
               <div class="flex justify-between text-slate-600">
                 <span>Items Subtotal (Cost)</span>
                 <span id="summary-subtotal" class="font-medium font-mono text-slate-900">$0.00</span>
@@ -299,15 +411,15 @@
               </div>
 
               <!-- With 3% Purchase Protection -->
-              <div class="pt-3 border-t border-rose-200/60 bg-rose-50/80 -mx-4 -mb-4 p-4 rounded-b-2xl flex justify-between items-baseline">
+              <div class="invoice-highlight-total pt-3 border-t border-rose-200/60 bg-rose-50/80 -mx-4 -mb-4 p-4 rounded-b-2xl flex justify-between items-baseline">
                 <div>
                   <div class="flex items-center gap-1.5">
-                    <span class="text-xs font-bold text-rose-900">Total with 3% Protection</span>
+                    <span class="invoice-highlight-label text-xs font-bold text-rose-900">Total with 3% Protection</span>
                     <span class="text-[9px] font-bold bg-rose-200 text-rose-800 uppercase px-1.5 py-0.5 rounded">Option</span>
                   </div>
                   <span class="text-[10px] text-rose-700 block" id="summary-fee-amount">+ $0.00 protection fee</span>
                 </div>
-                <span id="summary-protected-total" class="text-xl font-black font-mono text-rose-600">$0.00</span>
+                <span id="summary-protected-total" class="invoice-highlight-amount text-xl font-black font-mono text-rose-600">$0.00</span>
               </div>
             </div>
 
@@ -315,7 +427,7 @@
         </div>
 
         <!-- Footer Sign-off -->
-        <div class="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
+        <div class="invoice-footer mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
           Thank you for shopping the Selkie Sample Sale! 💕 We hope you adore your romantic & whimsical pieces!
         </div>
       </div>
@@ -535,6 +647,11 @@ let purchases = [
 ];
 
 let selectedBuyerName = purchases[0].buyer;
+const invoiceThemeSelect = document.getElementById('invoice-theme');
+invoiceThemeSelect.addEventListener('change', () => {
+  document.getElementById('invoice-printable').dataset.theme = invoiceThemeSelect.value;
+});
+
 const paymentMethods = {
   venmo: '',
   paypal: ''
