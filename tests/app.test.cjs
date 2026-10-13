@@ -87,6 +87,8 @@ test('invalid CSV and monetary values are rejected without replacing purchases',
   const { app, elements } = createApp();
   for (const csv of [
     'Buyer,Item Name,Cost\nA,Dress,abc',
+    'Buyer,Item Name,Cost\nA,Dress,$',
+    'Buyer,Item Name,Cost,Tax\nA,Dress,1,$ ',
     'Buyer,Item Name,Cost\nA,Dress,-1',
     'Buyer,Item Name,Cost\nA,Dress,1.234',
     'Buyer,Item Name,Cost\nA,Dress,1e3',
